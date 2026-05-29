@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+redis
+websockets
+paho-mqtt
+pydantic
+pydantic-settings
+python-dotenv
+httpx==0.27.0

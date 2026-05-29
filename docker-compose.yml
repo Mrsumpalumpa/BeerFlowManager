@@ -1,0 +1,186 @@
+version: "3.9"
+
+services:
+
+  # ─────────────────────────────────────────
+  # Infraestructura
+  # ─────────────────────────────────────────
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: beerflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-beerflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beerflow_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-beerflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beerflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: beerflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: beerflow-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────
+  # Microservicios
+  # ─────────────────────────────────────────
+
+  beerflow-service:
+    build:
+      context: ./services/beerflow-service
+      dockerfile: Dockerfile
+    container_name: beerflow-service
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      BILLING_SERVICE_URL: http://billing-service:8001
+      TAP_MANAGEMENT_URL: http://tap-management-service:8002
+      SERVICE_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - ./services/beerflow-service:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  billing-service:
+    build:
+      context: ./services/billing-service
+      dockerfile: Dockerfile
+    container_name: billing-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beerflow}:${POSTGRES_PASSWORD:-beerflow_secret}@postgres:5432/${POSTGRES_DB:-beerflow}
+      REDIS_URL: redis://redis:6379
+      SERVICE_PORT: 8001
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/billing-service:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  tap-management-service:
+    build:
+      context: ./services/tap-management-service
+      dockerfile: Dockerfile
+    container_name: tap-management-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beerflow}:${POSTGRES_PASSWORD:-beerflow_secret}@postgres:5432/${POSTGRES_DB:-beerflow}
+      SERVICE_PORT: 8002
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/tap-management-service:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────
+  # Frontend
+  # ─────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: beerflow-frontend
+    restart: unless-stopped
+    environment:
+      VITE_BEERFLOW_WS_URL: ws://localhost:8000
+      VITE_TAP_MANAGEMENT_URL: http://localhost:8002
+    ports:
+      - "3000:3000"
+    depends_on:
+      - beerflow-service
+    volumes:
+      - ./frontend/src:/app/src
+
+  # ─────────────────────────────────────────
+  # Simulador ESP32 (solo desarrollo)
+  # ─────────────────────────────────────────
+
+  sensor-simulator:
+    build:
+      context: ./hardware/simulator
+      dockerfile: Dockerfile
+    container_name: beerflow-simulator
+    restart: "no"
+    environment:
+      BEERFLOW_URL: http://beerflow-service:8000
+      TAP_ID: tap-001
+      PULSE_INTERVAL_MS: 200
+    depends_on:
+      beerflow-service:
+        condition: service_healthy
+    profiles:
+      - simulator
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_logs:
+
+networks:
+  default:
+    name: beerflow-network
