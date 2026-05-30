@@ -28,6 +28,31 @@ docker compose up -d
 docker compose --profile simulator up sensor-simulator
 ```
 
+## Simulador de Caudalímetro (Sensor)
+
+El simulador (`hardware/simulator/sensor_simulator.py`) emite pulsos simulando el consumo de cerveza de un grifo específico.
+
+### Ejecución con Docker Compose
+Por defecto, el contenedor simula el grifo `tap-001`. Para cambiar de grifo, puedes pasar la variable de entorno `TAP_ID` o ejecutar el comando explícito:
+
+* **Simular grifo por defecto (`tap-001`)**:
+  ```bash
+  docker compose --profile simulator up sensor-simulator
+  ```
+* **Simular un grifo específico (ej. `tap-002`)**:
+  ```bash
+  sudo docker compose run --rm -e TAP_ID=tap-004 sensor-simulator
+  
+  ```
+
+### Ejecución Local con Python
+Si prefieres ejecutar el simulador localmente sin docker:
+1. Instala `httpx` si no lo tienes: `pip install httpx`
+2. Ejecuta indicando el ID del grifo y opcionalmente la duración:
+   ```bash
+   python3 hardware/simulator/sensor_simulator.py --tap-id tap-002 --duration 30
+   ```
+
 ## Servicios
 
 | Servicio               | Puerto | Descripción                              |

@@ -48,6 +48,14 @@ def simulate(tap_id: str, duration_seconds: int = 30):
                         "timestamp": time.time(),
                     },
                 )
+                if resp.status_code != 200:
+                    try:
+                        err_msg = resp.json().get("detail", "Error desconocido")
+                    except Exception:
+                        err_msg = resp.text
+                    print(f"\n[simulator] ❌ Error del servidor ({resp.status_code}): {err_msg}")
+                    break
+
                 data = resp.json()
                 total_ml = data.get("ml_total", total_ml)
                 print(
@@ -56,7 +64,7 @@ def simulate(tap_id: str, duration_seconds: int = 30):
                     f"price=€{data.get('price', 0):.4f}"
                 )
             except Exception as e:
-                print(f"[simulator] Error: {e}")
+                print(f"[simulator] Error de conexión: {e}")
 
             time.sleep(INTERVAL_MS / 1000)
 

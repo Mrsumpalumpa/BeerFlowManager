@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   # ─────────────────────────────────────────
@@ -67,11 +65,13 @@ services:
     container_name: beerflow-service
     restart: unless-stopped
     environment:
-      REDIS_URL: redis://redis:6379
-      MQTT_BROKER_HOST: mosquitto
-      MQTT_BROKER_PORT: 1883
-      BILLING_SERVICE_URL: http://billing-service:8001
-      TAP_MANAGEMENT_URL: http://tap-management-service:8002
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-mosquitto}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      BILLING_SERVICE_URL: ${BILLING_SERVICE_URL:-http://billing-service:8001}
+      TAP_MANAGEMENT_URL: ${TAP_MANAGEMENT_URL:-http://tap-management-service:8002}
+      ML_PER_PULSE: ${ML_PER_PULSE:-2.25}
+      SESSION_TIMEOUT_SECONDS: ${SESSION_TIMEOUT_SECONDS:-5}
       SERVICE_PORT: 8000
     ports:
       - "8000:8000"
@@ -96,8 +96,13 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beerflow}:${POSTGRES_PASSWORD:-beerflow_secret}@postgres:5432/${POSTGRES_DB:-beerflow}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      SECRET_KEY: ${SECRET_KEY:-changeme_use_openssl_rand_hex_32}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       SERVICE_PORT: 8001
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin123}
     ports:
       - "8001:8001"
     depends_on:
@@ -121,6 +126,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beerflow}:${POSTGRES_PASSWORD:-beerflow_secret}@postgres:5432/${POSTGRES_DB:-beerflow}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      SECRET_KEY: ${SECRET_KEY:-changeme_use_openssl_rand_hex_32}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       SERVICE_PORT: 8002
     ports:
       - "8002:8002"
@@ -146,8 +154,9 @@ services:
     container_name: beerflow-frontend
     restart: unless-stopped
     environment:
-      VITE_BEERFLOW_WS_URL: ws://localhost:8000
-      VITE_TAP_MANAGEMENT_URL: http://localhost:8002
+      VITE_BEERFLOW_WS_URL: ${VITE_BEERFLOW_WS_URL:-ws://localhost:8000}
+      VITE_TAP_MANAGEMENT_URL: ${VITE_TAP_MANAGEMENT_URL:-http://localhost:8002}
+      VITE_BILLING_URL: ${VITE_BILLING_URL:-http://localhost:8001}
     ports:
       - "3000:3000"
     depends_on:
@@ -166,9 +175,9 @@ services:
     container_name: beerflow-simulator
     restart: "no"
     environment:
-      BEERFLOW_URL: http://beerflow-service:8000
-      TAP_ID: tap-001
-      PULSE_INTERVAL_MS: 200
+      BEERFLOW_URL: ${BEERFLOW_SERVICE_URL:-http://beerflow-service:8000}
+      TAP_ID: ${TAP_ID:-tap-001}
+      PULSE_INTERVAL_MS: ${PULSE_INTERVAL_MS:-200}
     depends_on:
       beerflow-service:
         condition: service_healthy
