@@ -4,12 +4,47 @@ import { useBeerWebSocket } from '../hooks/useBeerWebSocket';
 import BeerGlass from '../components/BeerGlass';
 import PriceCounter from '../components/PriceCounter';
 import { motion, AnimatePresence } from 'framer-motion';
+import beerflowMp3 from '../assets/beerflow.mp3';
 
 const API_URL = import.meta.env.VITE_TAP_MANAGEMENT_URL || 'http://localhost:8002';
 
 export default function PublicTapUI() {
   const queryClient = useQueryClient();
   const [tapId, setTapId] = useState('tap-001');
+
+  // Play beerflow.mp3 once on load (handling browser autoplay policies)
+  useEffect(() => {
+    const audio = new Audio(beerflowMp3);
+    let played = false;
+
+    const playAudio = async () => {
+      if (played) return;
+      try {
+        await audio.play();
+        played = true;
+        removeInteractionListeners();
+      } catch (err) {
+        console.log("Autoplay blocked, waiting for user interaction to play audio");
+      }
+    };
+
+    const removeInteractionListeners = () => {
+      window.removeEventListener('click', playAudio);
+      window.removeEventListener('keydown', playAudio);
+      window.removeEventListener('touchstart', playAudio);
+    };
+
+    playAudio();
+
+    window.addEventListener('click', playAudio);
+    window.addEventListener('keydown', playAudio);
+    window.addEventListener('touchstart', playAudio);
+
+    return () => {
+      removeInteractionListeners();
+      audio.pause();
+    };
+  }, []);
 
   // Query for the list of available/active taps
   const { data: taps = [], isLoading } = useQuery<any[]>({
