@@ -7,3 +7,7 @@ pydantic-settings
 python-dotenv
 PyJWT==2.8.0
 redis==5.0.4
+pytest
+pytest-asyncio
+httpx
+aiosqlite
