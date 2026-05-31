@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { jwtDecode } from 'jwt-decode';
 import { useEffect, useState } from 'react';
+import type { Tap } from '../models/TapModels';
 
 
 const API_URL = import.meta.env.VITE_TAP_MANAGEMENT_URL || 'http://localhost:8002';
@@ -15,7 +16,7 @@ export default function PublicTapUI() {
   const [tapId, setTapId] = useState('tap-001');
 
   // Query for the list of available/active taps
-  const { data: taps = [], isLoading } = useQuery<any[]>({
+  const { data: taps = [], isLoading } = useQuery<Tap[]>({
     queryKey: ['publicTaps'],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/taps`);

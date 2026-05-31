@@ -2,32 +2,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
-
-export interface StockStatus {
-  tap_id: string;
-  name: string;
-  keg_id: string | null;
-  current_volume_ml: number;
-  percentage_left: number;
-  is_low_stock: boolean;
-}
-
-export interface User {
-  id: number;
-  username: string;
-  role: string;
-}
-
-
-export interface Keg {
-  id: string;
-  name: string;
-  beer_style: string | null;
-  capacity_ml: number;
-  remaining_ml: number;
-  created_at?: string;
-  updated_at?: string;
-}
+import type { StockStatus, Keg } from '../models/TapModels';
+import type { User } from '../models/AuthModels';
 
 interface AdminContextType {
   taps: StockStatus[];

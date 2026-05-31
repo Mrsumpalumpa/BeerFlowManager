@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQuery } from '@tanstack/react-query';
+import type { MetricsResponse } from '../models/MetricsModels';
+import type { StockStatus } from '../models/TapModels';
 
 export default function AdminDashboard() {
   const { taps, kegs, users, alerts, createKeg, createTap, updateTap, deleteTap, deleteKeg, createUser, deleteUser, generateQrToken } = useAdmin();
@@ -16,7 +18,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'taps' | 'kegs' | 'add-tap' | 'users' | 'metrics'>('taps');
 
   // Fetch Metrics
-  const { data: metrics, isLoading: isMetricsLoading } = useQuery({
+  const { data: metrics, isLoading: isMetricsLoading } = useQuery<MetricsResponse>({
     queryKey: ['billingMetrics'],
     queryFn: async () => {
       const response = await fetch('/api/billing/metrics', {
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const startEditing = (tap: any) => {
+  const startEditing = (tap: StockStatus) => {
     setEditingTapId(tap.tap_id);
     setEditName(tap.name || '');
     setEditPrice(0.0065); 
