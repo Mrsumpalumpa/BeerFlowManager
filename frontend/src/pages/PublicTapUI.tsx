@@ -39,7 +39,7 @@ export default function PublicTapUI() {
     }
   }, [taps, tapId]);
 
-  const { ml_total, price_current, status, isConnected } = useBeerWebSocket(tapId);
+  const { ml_total, price_current, status, isConnected, customer_id } = useBeerWebSocket(tapId);
   const [isLocked, setIsLocked] = useState(true);
   const [scanError, setScanError] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -121,6 +121,13 @@ export default function PublicTapUI() {
       return () => clearTimeout(timer);
     }
   }, [status, isLocked, ml_total]);
+
+  // Auto-unlock if session is open (e.g. page refresh or external unlock)
+  useEffect(() => {
+    if (status === 'open' && isLocked) {
+      setIsLocked(false);
+    }
+  }, [status, isLocked]);
 
   const handleRefreshTaps = () => {
     queryClient.invalidateQueries({ queryKey: ['publicTaps'] });
@@ -232,6 +239,13 @@ export default function PublicTapUI() {
               <div className="absolute top-4 left-4 bg-gray-950/80 px-3 py-1 rounded-lg border border-gray-800/80 text-xs font-semibold text-gray-400">
                 MEDIDOR DE VOLUMEN
               </div>
+
+              {customer_id && (
+                <div className="absolute top-4 right-4 bg-purple-500/10 border border-purple-500/30 px-3 py-1 rounded-lg text-xs font-semibold text-purple-300 flex items-center gap-1.5 shadow-[0_0_10px_rgba(168,85,247,0.15)]">
+                  <span>👤</span>
+                  {customer_id}
+                </div>
+              )}
 
               <div className="mt-4">
                 <BeerGlass mlTotal={ml_total} />

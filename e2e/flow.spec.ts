@@ -26,7 +26,16 @@ test.describe('BeerFlow Manager E2E', () => {
     // Esperar a que se conecte el WebSocket (indicador en verde/Conectado)
     await page.waitForTimeout(1000);
 
-    // 2. Simular el envío de 20 pulsos de sensor a través del backend
+    // 2. Simular el desbloqueo del grifo (requerido por seguridad)
+    const unlockResponse = await request.post('http://localhost:8080/api/beerflow/sensor/unlock', {
+      data: {
+        tap_id: 'tap-001',
+        customer_id: 'admin' // Utilizamos el administrador por defecto
+      }
+    });
+    expect(unlockResponse.ok()).toBeTruthy();
+
+    // 3. Simular el envío de 20 pulsos de sensor a través del backend
     // A 2.25 ml por pulso, 20 pulsos representan exactamente 45 ml.
     const pulseResponse = await request.post('http://localhost:8080/api/beerflow/sensor/pulse', {
       data: {
@@ -37,19 +46,19 @@ test.describe('BeerFlow Manager E2E', () => {
     
     expect(pulseResponse.ok()).toBeTruthy();
     
-    // 3. Verificar que el frontend reciba la actualización en tiempo real por WebSocket
+    // 4. Verificar que el frontend reciba la actualización en tiempo real por WebSocket
     // Debe mostrar 45 ml y el indicador de "VERTIDO ACTIVO"
-    const volumeText = page.locator('span:has-text("ml")').locator('xpath=../span[1]');
+    const volumeText = page.locator('div.text-3xl span').first();
     await expect(volumeText).toHaveText('45');
     
     const activeLabel = page.locator('text=VERTIDO ACTIVO');
     await expect(activeLabel).toBeVisible();
 
-    // 4. Esperar el timeout de inactividad de la sesión (5 segundos por defecto + margen)
+    // 5. Esperar el timeout de inactividad de la sesión (5 segundos por defecto + margen)
     // El backend detecta la inactividad y envía un estado "closed" durante 30s
     await page.waitForTimeout(6500);
 
-    // 5. Verificar que se muestra la alerta de sesión finalizada y cobrada en el frontend
+    // 6. Verificar que se muestra la alerta de sesión finalizada y cobrada en el frontend
     const closedLabel = page.locator('text=¡Sesión Finalizada! Cobrando...');
     await expect(closedLabel).toBeVisible();
   });

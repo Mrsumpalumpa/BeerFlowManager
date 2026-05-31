@@ -61,15 +61,44 @@ async def test_login_invalid_credentials(client):
 
 @pytest.mark.asyncio
 async def test_close_order(client):
+    # Register a user first
+    await client.post("/auth/register", json={"username": "testclose", "password": "pwd", "role": "CUSTOMER"})
+    
     payload = {
         "tap_id": "tap-001",
-        "customer_id": "some-id",
+        "customer_id": "testclose",
+        "keg_id": "keg-1",
+        "beer_style": "IPA",
         "ml_served": 500,
         "total_amount": 3.25
     }
     resp = await client.post("/orders/close", json=payload)
     assert resp.status_code == 200
     assert resp.json() == {"ok": True, "order_id": None}
+
+@pytest.mark.asyncio
+async def test_metrics(client):
+    # Ensure there's a user and a consumption
+    await client.post("/auth/register", json={"username": "metricuser", "password": "pwd", "role": "CUSTOMER"})
+    await client.post("/orders/close", json={
+        "tap_id": "tap-metrics",
+        "customer_id": "metricuser",
+        "keg_id": "keg-metrics",
+        "beer_style": "Stout",
+        "ml_served": 1000,
+        "total_amount": 6.50
+    })
+    
+    resp = await client.get("/metrics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "top_customers" in data
+    assert "beer_styles" in data
+    assert "recent" in data
+    
+    # Check if the Stout was recorded
+    assert any(b["beer_style"] == "Stout" and b["total_ml"] >= 1000 for b in data["beer_styles"])
+    assert any(c["username"] == "metricuser" and c["total_ml"] >= 1000 for c in data["top_customers"])
 
 @pytest.mark.asyncio
 async def test_get_users_admin(client):
