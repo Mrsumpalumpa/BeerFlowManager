@@ -12,6 +12,13 @@ export interface StockStatus {
   is_low_stock: boolean;
 }
 
+export interface User {
+  id: number;
+  username: string;
+  role: string;
+}
+
+
 export interface Keg {
   id: string;
   name: string;
@@ -25,15 +32,21 @@ export interface Keg {
 interface AdminContextType {
   taps: StockStatus[];
   kegs: Keg[];
+  users: User[];
   alerts: string[];
   replaceKeg: (tapId: string) => Promise<void>;
   fetchStock: () => Promise<void>;
   fetchKegs: () => Promise<void>;
+  fetchUsers: () => Promise<void>;
   createKeg: (keg: { name: string; beer_style?: string; capacity_ml: number }) => Promise<void>;
   createTap: (tap: { tap_code: string; name?: string; price_per_ml: number; keg_id?: string }) => Promise<void>;
   updateTap: (tapId: string, updates: { name?: string; price_per_ml?: number; keg_id?: string; is_active?: boolean }) => Promise<void>;
   deleteTap: (tapId: string) => Promise<void>;
   deleteKeg: (kegId: string) => Promise<void>;
+  createUser: (user: { username: string; password?: string; role?: string }) => Promise<User>;
+  updateUser: (userId: number, updates: { password?: string; role?: string }) => Promise<void>;
+  deleteUser: (userId: number) => Promise<void>;
+  generateQrToken: (userId: number) => Promise<string>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -45,8 +58,10 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   
   const WS_URL = import.meta.env.VITE_TAP_MANAGEMENT_WS_URL || 'ws://localhost:8002/ws/admin';
   const API_URL = import.meta.env.VITE_TAP_MANAGEMENT_URL || 'http://localhost:8002';
+  const BILLING_URL = import.meta.env.VITE_BILLING_URL || 'http://localhost:8001';
 
   const isEnabled = !!(isAuthenticated && role === 'ADMIN' && token);
+
 
   // 1. Queries
   const tapsQuery = useQuery({
@@ -73,9 +88,23 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     enabled: isEnabled,
   });
 
+  const usersQuery = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: async (): Promise<User[]> => {
+      const res = await fetch(`${BILLING_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Error al cargar usuarios');
+      return res.json();
+    },
+    enabled: isEnabled,
+  });
+
   // Helper getters to keep compatibility
   const taps = tapsQuery.data || [];
   const kegs = kegsQuery.data || [];
+  const users = usersQuery.data || [];
+
 
   const fetchStock = async () => {
     await tapsQuery.refetch();
@@ -84,6 +113,11 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const fetchKegs = async () => {
     await kegsQuery.refetch();
   };
+
+  const fetchUsers = async () => {
+    await usersQuery.refetch();
+  };
+
 
   // 2. Mutations
   const replaceKegMutation = useMutation({
@@ -215,6 +249,60 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     await deleteKegMutation.mutateAsync(kegId);
   };
 
+  const createUser = async (user: { username: string; password?: string; role?: string }) => {
+    const res = await fetch(`${BILLING_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Error al crear usuario');
+    }
+    const newUser = await res.json();
+    queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+    return newUser;
+  };
+
+  const updateUser = async (userId: number, updates: { password?: string; role?: string }) => {
+    const res = await fetch(`${BILLING_URL}/auth/users/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Error al actualizar usuario');
+    }
+    queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+  };
+
+  const deleteUser = async (userId: number) => {
+    const res = await fetch(`${BILLING_URL}/auth/users/${userId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Error al eliminar usuario');
+    queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+  };
+
+  const generateQrToken = async (userId: number) => {
+    const res = await fetch(`${BILLING_URL}/auth/users/${userId}/qr-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Error al generar token QR');
+    const data = await res.json();
+    return data.access_token;
+  };
+
+
   // 3. Real-time updates via WebSockets synced with TanStack Query Cache
   useEffect(() => {
     if (isEnabled) {
@@ -255,7 +343,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   }, [isEnabled, WS_URL, queryClient]);
 
   return (
-    <AdminContext.Provider value={{ taps, kegs, alerts, replaceKeg, fetchStock, fetchKegs, createKeg, createTap, updateTap, deleteTap, deleteKeg }}>
+    <AdminContext.Provider value={{ 
+        taps, kegs, users, alerts, 
+        replaceKeg, fetchStock, fetchKegs, fetchUsers, 
+        createKeg, createTap, updateTap, deleteTap, deleteKeg,
+        createUser, updateUser, deleteUser, generateQrToken
+      }}>
       {children}
     </AdminContext.Provider>
   );

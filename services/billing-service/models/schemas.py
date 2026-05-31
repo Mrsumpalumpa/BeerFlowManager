@@ -7,6 +7,10 @@ class UserCreate(BaseModel):
     password: str
     role: Optional[RoleEnum] = RoleEnum.CUSTOMER
 
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[RoleEnum] = None
+
 class UserResponse(BaseModel):
     id: int
     username: str

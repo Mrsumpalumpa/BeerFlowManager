@@ -89,3 +89,47 @@ async def get_current_admin_user(current_user: User = Depends(get_current_user))
     if current_user.role != RoleEnum.ADMIN:
         raise HTTPException(status_code=403, detail="Not enough privileges")
     return current_user
+
+@router.get("/users", response_model=list[UserResponse])
+async def get_all_users(db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
+    result = await db.execute(select(User))
+    return result.scalars().all()
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.delete(user)
+    await db.commit()
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: int, user_update: dict, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if "password" in user_update and user_update["password"]:
+        user.password_hash = get_password_hash(user_update["password"])
+    if "role" in user_update and user_update["role"]:
+        user.role = RoleEnum(user_update["role"])
+        
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+@router.post("/users/{user_id}/qr-token", response_model=Token)
+async def generate_qr_token(user_id: int, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate a long-lived token (e.g. 1 year) for the QR code
+    access_token_expires = timedelta(days=365)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role.value}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer", "role": user.role.value}

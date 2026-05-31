@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function AdminDashboard() {
-  const { taps, kegs, alerts, createKeg, createTap, updateTap, deleteTap, deleteKeg } = useAdmin();
+  const { taps, kegs, users, alerts, createKeg, createTap, updateTap, deleteTap, deleteKeg, createUser, deleteUser, generateQrToken } = useAdmin();
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   const assignedKegIds = taps.map(t => t.keg_id).filter(Boolean) as string[];
   const availableKegs = kegs.filter(k => !assignedKegIds.includes(k.id));
 
-  const [activeTab, setActiveTab] = useState<'taps' | 'kegs' | 'add-tap'>('taps');
+  const [activeTab, setActiveTab] = useState<'taps' | 'kegs' | 'add-tap' | 'users'>('taps');
+
 
   // Form states for creating a Keg
   const [kegName, setKegName] = useState('');
@@ -33,6 +35,17 @@ export default function AdminDashboard() {
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState(0);
   const [editKegId, setEditKegId] = useState('');
+
+  // User management states
+  const [newUsername, setNewUsername] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [userError, setUserError] = useState('');
+  
+  // QR Modal states
+  const [qrToken, setQrToken] = useState('');
+  const [qrUsername, setQrUsername] = useState('');
+  const [showQrModal, setShowQrModal] = useState(false);
+
 
   // Replacing keg state
   const [replacingTapId, setReplacingTapId] = useState<string | null>(null);
@@ -71,6 +84,43 @@ export default function AdminDashboard() {
       alert(err.message || 'Error al eliminar el barril');
     }
   };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente?')) return;
+    try {
+      await deleteUser(userId);
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar cliente');
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserError('');
+    try {
+      const newUser = await createUser({ username: newUsername, password: newUserPassword, role: 'CUSTOMER' });
+      const token = await generateQrToken(newUser.id);
+      setQrToken(token);
+      setQrUsername(newUser.username);
+      setShowQrModal(true);
+      setNewUsername('');
+      setNewUserPassword('');
+    } catch (err: any) {
+      setUserError(err.message || 'Error al crear cliente');
+    }
+  };
+
+  const handleShowQrForUser = async (userId: number, username: string) => {
+    try {
+      const token = await generateQrToken(userId);
+      setQrToken(token);
+      setQrUsername(username);
+      setShowQrModal(true);
+    } catch (err: any) {
+      alert('Error al generar QR');
+    }
+  };
+
 
   const handleCreateKeg = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,9 +251,20 @@ export default function AdminDashboard() {
           >
             ➕ Añadir Nuevo Grifo
           </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none whitespace-nowrap ${
+              activeTab === 'users' 
+                ? 'border-purple-500 text-purple-400' 
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            👥 Clientes
+          </button>
         </nav>
 
         {/* Tab Contents */}
+
         <main className="flex-1">
           
           {/* TAPS TAB */}
@@ -597,8 +658,142 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* USERS TAB */}
+          {activeTab === 'users' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Create User Form */}
+              <form 
+                onSubmit={handleCreateUser}
+                className="lg:col-span-1 bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 p-6 rounded-2xl flex flex-col gap-4.5 h-fit shadow-md"
+              >
+                <h3 className="text-base font-bold text-white">Registrar Cliente</h3>
+
+                {userError && <p className="text-xs text-rose-400 bg-rose-950/30 border border-rose-900/50 p-2.5 rounded-lg">{userError}</p>}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-400">Usuario / Alias</label>
+                  <input 
+                    type="text" 
+                    value={newUsername} 
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    placeholder="ej. JuanPerez"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-400">Contraseña (Opcional)</label>
+                  <input 
+                    type="password" 
+                    value={newUserPassword} 
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="Dejar vacío para auto-generar"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full mt-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-purple-900/20 active:scale-[0.98] transition-all cursor-pointer text-sm"
+                >
+                  Generar QR de Acceso
+                </button>
+              </form>
+
+              {/* Users List */}
+              <div className="lg:col-span-2 flex flex-col gap-4">
+                <h3 className="text-base font-bold text-white">Clientes Registrados</h3>
+                <div className="w-full overflow-hidden border border-slate-800/80 rounded-2xl bg-slate-900/20 backdrop-blur-sm shadow-md">
+                  <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-900/80 border-b border-slate-800">
+                          <th className="py-3 px-4 text-xs font-bold uppercase text-slate-400 tracking-wider">ID</th>
+                          <th className="py-3 px-4 text-xs font-bold uppercase text-slate-400 tracking-wider">Usuario</th>
+                          <th className="py-3 px-4 text-xs font-bold uppercase text-slate-400 tracking-wider">Rol</th>
+                          <th className="py-3 px-4 text-xs font-bold uppercase text-slate-400 tracking-wider text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {users.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-8 px-4 text-center text-sm text-slate-500">
+                              No hay usuarios registrados.
+                            </td>
+                          </tr>
+                        ) : (
+                          users.map(u => (
+                            <tr key={u.id} className="hover:bg-slate-900/30 transition-colors">
+                              <td className="py-3.5 px-4 text-sm font-semibold text-slate-400">#{u.id}</td>
+                              <td className="py-3.5 px-4 text-sm font-bold text-white">{u.username}</td>
+                              <td className="py-3.5 px-4 text-sm">
+                                <span className={`px-2.5 py-0.5 border text-xs font-semibold rounded-md ${
+                                  u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' : 'bg-blue-500/10 text-blue-400 border-blue-500/25'
+                                }`}>
+                                  {u.role}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-sm text-right flex justify-end gap-2">
+                                <button
+                                  onClick={() => handleShowQrForUser(u.id, u.username)}
+                                  className="p-1.5 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-900/30 hover:border-purple-900/50 text-purple-400 hover:text-purple-300 rounded-lg transition-all duration-200 cursor-pointer"
+                                  title="Mostrar QR"
+                                >
+                                  📱
+                                </button>
+                                {u.role !== 'ADMIN' && (
+                                  <button
+                                    onClick={() => handleDeleteUser(u.id)}
+                                    className="p-1.5 bg-rose-900/20 hover:bg-rose-900/40 border border-rose-900/30 hover:border-rose-900/50 text-rose-400 hover:text-rose-300 rounded-lg transition-all duration-200 cursor-pointer"
+                                    title="Eliminar usuario"
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
+
+      {/* QR Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-sm w-full flex flex-col items-center shadow-2xl relative">
+            <button 
+              onClick={() => setShowQrModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer"
+            >
+              ✕
+            </button>
+            <h3 className="text-xl font-bold text-white mb-2 text-center">Pulsera Virtual</h3>
+            <p className="text-sm text-slate-400 mb-6 text-center">
+              Haz una foto de este código QR. Sirve para desbloquear los grifos a nombre de <strong className="text-purple-400">{qrUsername}</strong>.
+            </p>
+            <div className="bg-white p-4 rounded-xl shadow-inner mb-6">
+              <QRCodeSVG value={qrToken} size={280} level="L" includeMargin={true} />
+            </div>
+            <button 
+              onClick={() => setShowQrModal(false)}
+
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition-all cursor-pointer text-sm"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

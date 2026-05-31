@@ -22,6 +22,10 @@ class PulsePayload(BaseModel):
     pulses: int                  # pulsos recibidos en este intervalo
     timestamp: float | None = None
 
+class UnlockPayload(BaseModel):
+    tap_id: str
+    customer_id: str
+
 
 async def get_redis(request: Request):
     return request.app.state.redis
@@ -97,18 +101,25 @@ async def receive_pulse(
 
     # Leer estado actual
     raw = await redis.get(tap_key)
-    state = json.loads(raw) if raw else {
-        "tap_id": payload.tap_id,
-        "ml_total": 0.0,
-        "price_current": 0.0,
-        "status": "open",
-        "last_pulse_at": now,
-        "customer_id": None,
-    }
+    
+    if not raw:
+        raise HTTPException(
+            status_code=403,
+            detail="El grifo está bloqueado. Por favor, autentícate primero escaneando tu QR."
+        )
+        
+    state = json.loads(raw)
+    
+    if state.get("status") != "open" or not state.get("customer_id"):
+         raise HTTPException(
+            status_code=403,
+            detail="El grifo está bloqueado. Por favor, autentícate primero escaneando tu QR."
+        )
 
     # Asignar estilo de cerveza y keg_id al estado de la sesión
     state["keg_id"] = keg_id if keg_id != "no-keg" else None
     state["beer_style"] = style
+
 
     # Calcular incremento
     ml_increment = payload.pulses * ML_PER_PULSE
@@ -145,3 +156,27 @@ async def _get_price_per_ml(redis, tap_id: str) -> float:
     price_key = f"tap_price:{tap_id}"
     price = await redis.get(price_key)
     return float(price) if price else 0.0065  # fallback €/ml
+
+@router.post("/unlock")
+async def unlock_tap(
+    payload: UnlockPayload,
+    redis=Depends(get_redis),
+):
+    """
+    Desbloquea el grifo para un cliente específico.
+    """
+    tap_key = f"tap:{payload.tap_id}"
+    now = time.time()
+    
+    # Initialize a new session
+    state = {
+        "tap_id": payload.tap_id,
+        "ml_total": 0.0,
+        "price_current": 0.0,
+        "status": "open",
+        "last_pulse_at": now,
+        "customer_id": payload.customer_id,
+    }
+    
+    await redis.setex(tap_key, 300, json.dumps(state))
+    return {"ok": True, "message": "Grifo desbloqueado exitosamente"}

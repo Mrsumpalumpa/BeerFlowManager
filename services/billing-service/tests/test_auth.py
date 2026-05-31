@@ -70,3 +70,42 @@ async def test_close_order(client):
     resp = await client.post("/orders/close", json=payload)
     assert resp.status_code == 200
     assert resp.json() == {"ok": True, "order_id": None}
+
+@pytest.mark.asyncio
+async def test_get_users_admin(client):
+    # Register an admin
+    await client.post("/auth/register", json={"username": "testadmin", "password": "adminpass", "role": "ADMIN"})
+    # Register a customer
+    await client.post("/auth/register", json={"username": "testcust", "password": "custpass", "role": "CUSTOMER"})
+    
+    # Login admin
+    resp_login = await client.post("/auth/login", data={"username": "testadmin", "password": "adminpass"})
+    token = resp_login.json()["access_token"]
+    
+    # Get users
+    resp_users = await client.get("/auth/users", headers={"Authorization": f"Bearer {token}"})
+    assert resp_users.status_code == 200
+    users = resp_users.json()
+    assert len(users) >= 2
+    assert any(u["username"] == "testadmin" for u in users)
+    assert any(u["username"] == "testcust" for u in users)
+
+@pytest.mark.asyncio
+async def test_generate_qr_token(client):
+    # Register an admin
+    await client.post("/auth/register", json={"username": "adminqr", "password": "adminpass", "role": "ADMIN"})
+    resp_reg = await client.post("/auth/register", json={"username": "custqr", "password": "custpass", "role": "CUSTOMER"})
+    cust_id = resp_reg.json()["id"]
+    
+    # Login admin
+    resp_login = await client.post("/auth/login", data={"username": "adminqr", "password": "adminpass"})
+    token = resp_login.json()["access_token"]
+    
+    # Generate QR Token
+    resp_qr = await client.post(f"/auth/users/{cust_id}/qr-token", headers={"Authorization": f"Bearer {token}"})
+    assert resp_qr.status_code == 200
+    qr_data = resp_qr.json()
+    assert "access_token" in qr_data
+    assert qr_data["token_type"] == "bearer"
+    assert qr_data["role"] == "CUSTOMER"
+
