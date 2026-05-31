@@ -1,0 +1,27 @@
+services:
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: beerflow-frontend
+    restart: unless-stopped
+    environment:
+      VITE_BEERFLOW_WS_URL: ${VITE_BEERFLOW_WS_URL:-ws://localhost:8080}
+      VITE_TAP_MANAGEMENT_URL: ${VITE_TAP_MANAGEMENT_URL:-http://localhost:8080/api/taps}
+      VITE_BILLING_URL: ${VITE_BILLING_URL:-http://localhost:8080/api/billing}
+      VITE_TAP_MANAGEMENT_WS_URL: ${VITE_TAP_MANAGEMENT_WS_URL:-ws://localhost:8080/ws/admin}
+    volumes:
+      - ./frontend/src:/app/src
+
+  nginx:
+    # Sobrescribimos el build de producción para evitar compilar React dentro del contenedor en desarrollo
+    build: null
+    image: nginx:alpine
+    volumes:
+      - ./infra/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - beerflow-service
+      - billing-service
+      - tap-management-service

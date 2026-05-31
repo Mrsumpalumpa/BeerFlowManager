@@ -73,8 +73,6 @@ services:
       ML_PER_PULSE: ${ML_PER_PULSE:-2.25}
       SESSION_TIMEOUT_SECONDS: ${SESSION_TIMEOUT_SECONDS:-5}
       SERVICE_PORT: 8000
-    ports:
-      - "8000:8000"
     depends_on:
       redis:
         condition: service_healthy
@@ -103,8 +101,6 @@ services:
       SERVICE_PORT: 8001
       INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin123}
-    ports:
-      - "8001:8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -130,8 +126,6 @@ services:
       SECRET_KEY: ${SECRET_KEY:-changeme_use_openssl_rand_hex_32}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       SERVICE_PORT: 8002
-    ports:
-      - "8002:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -147,22 +141,20 @@ services:
   # Frontend
   # ─────────────────────────────────────────
 
-  frontend:
+  nginx:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: beerflow-frontend
+      context: .
+      dockerfile: ./infra/nginx/Dockerfile
+    container_name: beerflow-nginx
     restart: unless-stopped
-    environment:
-      VITE_BEERFLOW_WS_URL: ${VITE_BEERFLOW_WS_URL:-ws://localhost:8000}
-      VITE_TAP_MANAGEMENT_URL: ${VITE_TAP_MANAGEMENT_URL:-http://localhost:8002}
-      VITE_BILLING_URL: ${VITE_BILLING_URL:-http://localhost:8001}
     ports:
-      - "3000:3000"
+      - "8080:80"
     depends_on:
       - beerflow-service
-    volumes:
-      - ./frontend/src:/app/src
+      - billing-service
+      - tap-management-service
+
+
 
   # ─────────────────────────────────────────
   # Simulador ESP32 (solo desarrollo)

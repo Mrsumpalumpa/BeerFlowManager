@@ -28,7 +28,7 @@ test.describe('BeerFlow Manager E2E', () => {
 
     // 2. Simular el envío de 20 pulsos de sensor a través del backend
     // A 2.25 ml por pulso, 20 pulsos representan exactamente 45 ml.
-    const pulseResponse = await request.post('http://localhost:8000/sensor/pulse', {
+    const pulseResponse = await request.post('http://localhost:8080/api/beerflow/sensor/pulse', {
       data: {
         tap_id: 'tap-001',
         pulses: 20
