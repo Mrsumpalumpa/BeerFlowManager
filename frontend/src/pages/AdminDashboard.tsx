@@ -3,6 +3,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import { useQuery } from '@tanstack/react-query';
 
 export default function AdminDashboard() {
   const { taps, kegs, users, alerts, createKeg, createTap, updateTap, deleteTap, deleteKeg, createUser, deleteUser, generateQrToken } = useAdmin();
@@ -12,7 +13,21 @@ export default function AdminDashboard() {
   const assignedKegIds = taps.map(t => t.keg_id).filter(Boolean) as string[];
   const availableKegs = kegs.filter(k => !assignedKegIds.includes(k.id));
 
-  const [activeTab, setActiveTab] = useState<'taps' | 'kegs' | 'add-tap' | 'users'>('taps');
+  const [activeTab, setActiveTab] = useState<'taps' | 'kegs' | 'add-tap' | 'users' | 'metrics'>('taps');
+
+  // Fetch Metrics
+  const { data: metrics, isLoading: isMetricsLoading } = useQuery({
+    queryKey: ['billingMetrics'],
+    queryFn: async () => {
+      const response = await fetch('/api/billing/metrics', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Error al obtener métricas');
+      return response.json();
+    },
+    enabled: activeTab === 'metrics',
+    refetchInterval: 10000, // Refresh every 10s
+  });
 
 
   // Form states for creating a Keg
@@ -260,6 +275,16 @@ export default function AdminDashboard() {
             }`}
           >
             👥 Clientes
+          </button>
+          <button
+            onClick={() => setActiveTab('metrics')}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none whitespace-nowrap ${
+              activeTab === 'metrics' 
+                ? 'border-purple-500 text-purple-400' 
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            📊 Métricas y Consumos
           </button>
         </nav>
 
@@ -760,6 +785,128 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* METRICS TAB */}
+          {activeTab === 'metrics' && (
+            <div className="flex flex-col gap-8">
+              {isMetricsLoading ? (
+                <div className="py-16 text-center text-slate-400 animate-pulse">Cargando métricas...</div>
+              ) : !metrics ? (
+                <div className="py-16 text-center text-rose-400">Error al cargar las métricas.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Top Customers */}
+                    <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 p-6 rounded-2xl flex flex-col gap-4 shadow-md">
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">🏆 Top Clientes (Gasto)</h3>
+                      <div className="flex flex-col gap-3">
+                        {metrics.top_customers.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">Sin datos registrados.</p>
+                        ) : (
+                          metrics.top_customers.map((c: any, i: number) => {
+                            const maxEur = Math.max(...metrics.top_customers.map((x: any) => x.total_eur));
+                            const percentage = maxEur > 0 ? (c.total_eur / maxEur) * 100 : 0;
+                            return (
+                              <div key={i} className="flex flex-col gap-1.5">
+                                <div className="flex justify-between text-sm">
+                                  <span className="font-semibold text-slate-300">{i + 1}. {c.username}</span>
+                                  <span className="font-bold text-purple-400">€{c.total_eur.toFixed(2)} <span className="text-xs text-slate-500 font-normal ml-1">({c.total_ml.toFixed(0)}ml)</span></span>
+                                </div>
+                                <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Popular Beer Styles */}
+                    <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 p-6 rounded-2xl flex flex-col gap-4 shadow-md">
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">🍺 Popularidad por Estilo</h3>
+                      <div className="flex flex-col gap-3">
+                        {metrics.beer_styles.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">Sin datos registrados.</p>
+                        ) : (
+                          metrics.beer_styles.map((b: any, i: number) => {
+                            const maxMl = Math.max(...metrics.beer_styles.map((x: any) => x.total_ml));
+                            const percentage = maxMl > 0 ? (b.total_ml / maxMl) * 100 : 0;
+                            return (
+                              <div key={i} className="flex flex-col gap-1.5">
+                                <div className="flex justify-between text-sm">
+                                  <span className="font-semibold text-slate-300">{b.beer_style}</span>
+                                  <span className="font-bold text-emerald-400">{b.total_ml.toFixed(0)} ml <span className="text-xs text-slate-500 font-normal ml-1">(€{b.total_eur.toFixed(2)})</span></span>
+                                </div>
+                                <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-1000 ease-out"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Consumptions Table */}
+                  <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 rounded-2xl flex flex-col shadow-md overflow-hidden">
+                    <div className="p-6 border-b border-slate-800/80">
+                      <h3 className="text-base font-bold text-white">⏱️ Historial Reciente de Consumos</h3>
+                    </div>
+                    <div className="overflow-x-auto no-scrollbar">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900/80 border-b border-slate-800">
+                            <th className="py-3 px-6 text-xs font-bold uppercase text-slate-400 tracking-wider">Fecha y Hora</th>
+                            <th className="py-3 px-6 text-xs font-bold uppercase text-slate-400 tracking-wider">Cliente</th>
+                            <th className="py-3 px-6 text-xs font-bold uppercase text-slate-400 tracking-wider">Grifo / Estilo</th>
+                            <th className="py-3 px-6 text-xs font-bold uppercase text-slate-400 tracking-wider text-right">Volumen</th>
+                            <th className="py-3 px-6 text-xs font-bold uppercase text-slate-400 tracking-wider text-right">Importe</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {metrics.recent.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-8 px-6 text-center text-sm text-slate-500">
+                                Aún no se ha registrado ningún consumo.
+                              </td>
+                            </tr>
+                          ) : (
+                            metrics.recent.map((r: any, i: number) => {
+                              const date = new Date(r.date);
+                              return (
+                                <tr key={i} className="hover:bg-slate-900/30 transition-colors">
+                                  <td className="py-3.5 px-6 text-sm text-slate-400">
+                                    {date.toLocaleDateString()} <span className="text-xs ml-1 opacity-70">{date.toLocaleTimeString()}</span>
+                                  </td>
+                                  <td className="py-3.5 px-6 text-sm font-bold text-white">{r.username}</td>
+                                  <td className="py-3.5 px-6 text-sm">
+                                    <div className="flex flex-col">
+                                      <span className="text-slate-300 font-medium">{r.tap_id}</span>
+                                      <span className="text-xs text-purple-400">{r.beer_style}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3.5 px-6 text-sm font-semibold text-slate-300 text-right">{r.ml_served.toFixed(1)} ml</td>
+                                  <td className="py-3.5 px-6 text-sm font-bold text-emerald-400 text-right">€{r.total_amount.toFixed(2)}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

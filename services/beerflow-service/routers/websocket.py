@@ -34,17 +34,8 @@ async def tap_websocket(websocket: WebSocket, tap_id: str):
                 now = time.time()
                 idle_seconds = now - state.get("last_pulse_at", now)
 
-                # Detectar cierre de grifo por inactividad
-                if state["status"] == "open" and idle_seconds >= SESSION_TIMEOUT:
-                    state["status"] = "closed"
-                    # Mantener estado 'closed' visible durante CLOSED_STATE_TTL segundos
-                    # antes de que Redis elimine la clave y se emita idle.
-                    await redis.setex(tap_key, CLOSED_STATE_TTL, json.dumps(state))
-
-                    # Notificar al billing-service para cobrar
-                    asyncio.create_task(
-                        _close_session(tap_id, state, redis)
-                    )
+                # La inactividad y cierre automático (SESSION_TIMEOUT) ahora es
+                # gestionada por el background task `cleanup_idle_sessions` en main.py
 
                 await websocket.send_json(state)
             else:
@@ -79,6 +70,8 @@ async def _close_session(tap_id: str, state: dict, redis):
                 json={
                     "tap_id": tap_id,
                     "customer_id": state.get("customer_id"),
+                    "keg_id": state.get("keg_id") or "no-keg",
+                    "beer_style": state.get("beer_style", "Cerveza"),
                     "ml_served": state.get("ml_total", 0),
                     "total_amount": state.get("price_current", 0),
                 },
