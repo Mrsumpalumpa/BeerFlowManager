@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeerFlow Manager — Diagrama de Arquitectura</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: rgba(30, 41, 59, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      /* Accent colors */
+      --color-frontend: #38bdf8; /* Cyan */
+      --color-beerflow: #fbbf24; /* Amber */
+      --color-billing: #a78bfa; /* Purple */
+      --color-taps: #34d399; /* Emerald */
+      --color-db: #f43f5e; /* Rose */
+      --color-mqtt: #22d3ee; /* Light blue */
+      --color-redis: #ef4444; /* Red */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: 2rem;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 40%);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(to right, #38bdf8, #a78bfa, #fbbf24);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Layout grid for diagram + details */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+    }
+
+    @media (min-width: 1024px) {
+      .layout {
+        grid-template-columns: 3fr 2fr;
+      }
+    }
+
+    /* Card Styling */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 1.5rem;
+      padding: 2rem;
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+    }
+
+    .diagram-container {
+      position: relative;
+      width: 100%;
+      min-height: 580px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* SVG Diagram Styling */
+    svg.arch-graph {
+      width: 100%;
+      height: 100%;
+      min-height: 580px;
+    }
+
+    .node {
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .node:hover {
+      filter: brightness(1.2) drop-shadow(0 0 8px currentColor);
+    }
+
+    .node rect {
+      fill: rgba(30, 41, 59, 0.95);
+      stroke-width: 2px;
+      rx: 12px;
+    }
+
+    .node text {
+      fill: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .node text.port {
+      fill: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .link {
+      fill: none;
+      stroke-width: 2px;
+      stroke-linecap: round;
+      opacity: 0.6;
+      transition: all 0.3s;
+    }
+
+    .link.dashed {
+      stroke-dasharray: 6, 4;
+      animation: dash 20s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -1000;
+      }
+    }
+
+    .link-label {
+      font-size: 10px;
+      fill: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Details Panel */
+    .details-panel h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+      color: #38bdf8;
+    }
+
+    .info-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .info-section h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .info-section h3 .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .info-section p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .flow-steps {
+      margin-top: 2rem;
+    }
+
+    .flow-steps h3 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: var(--color-beerflow);
+    }
+
+    .step-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      background: rgba(251, 191, 36, 0.1);
+      color: var(--color-beerflow);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .step-text h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-text p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    /* Interactive highlights */
+    .active-link {
+      stroke-width: 4px !important;
+      opacity: 1 !important;
+      filter: drop-shadow(0 0 4px currentColor);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>BeerFlow Manager</h1>
+      <p class="subtitle">Diagrama de Arquitectura de Microservicios y Flujo de Datos IoT</p>
+    </header>
+
+    <div class="layout">
+      <!-- Diagram Column -->
+      <div class="card">
+        <div class="diagram-container">
+          <svg class="arch-graph" viewBox="0 0 750 550">
+            <!-- Definitions for markers (arrows) -->
+            <defs>
+              <marker id="arrow-frontend" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#38bdf8"/>
+              </marker>
+              <marker id="arrow-beerflow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#fbbf24"/>
+              </marker>
+              <marker id="arrow-billing" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#a78bfa"/>
+              </marker>
+              <marker id="arrow-taps" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#34d399"/>
+              </marker>
+              <marker id="arrow-generic" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"/>
+              </marker>
+            </defs>
+
+            <!-- Links (Connections) -->
+            <!-- Sensor -> BeerFlow (HTTP Pulse) -->
+            <path id="link-sensor-bf" class="link dashed" d="M 120 120 L 260 120" stroke="#fbbf24" />
+            <text class="link-label" x="145" y="112">HTTP /sensor/pulse</text>
+
+            <!-- Sensor -> Mosquitto (MQTT) -->
+            <path id="link-sensor-mqtt" class="link dashed" d="M 120 150 L 120 280" stroke="#22d3ee" />
+            <text class="link-label" x="125" y="220" transform="rotate(90, 120, 220)">MQTT pulses</text>
+
+            <!-- Mosquitto -> BeerFlow (MQTT sub) -->
+            <path id="link-mqtt-bf" class="link dashed" d="M 180 320 L 260 200" stroke="#22d3ee" />
+            
+            <!-- Frontend -> Beerflow (WS state stream) -->
+            <path id="link-fe-bf" class="link dashed" d="M 370 290 L 370 200" stroke="#38bdf8" />
+            <text class="link-label" x="375" y="250" transform="rotate(-90, 375, 250)">WebSocket /ws/{id}</text>
+
+            <!-- Frontend -> Billing (Auth REST) -->
+            <path id="link-fe-bill" class="link" d="M 430 350 L 520 350" stroke="#a78bfa" marker-end="url(#arrow-billing)" />
+            <text class="link-label" x="435" y="342">HTTP REST (JWT)</text>
+
+            <!-- Frontend -> Taps (REST lists) -->
+            <path id="link-fe-taps" class="link" d="M 410 410 L 520 460" stroke="#34d399" marker-end="url(#arrow-taps)" />
+            <text class="link-label" x="435" y="445" transform="rotate(18, 435, 445)">HTTP /taps</text>
+
+            <!-- BeerFlow -> Redis (Session Cache & PubSub Alerts) -->
+            <path id="link-bf-redis" class="link" d="M 280 200 L 280 290" stroke="#ef4444" />
+            <text class="link-label" x="220" y="240">Cache/PubSub</text>
+
+            <!-- BeerFlow -> Billing (Close session REST) -->
+            <path id="link-bf-bill" class="link" d="M 410 150 L 570 320" stroke="#a78bfa" marker-end="url(#arrow-billing)" />
+            <text class="link-label" x="480" y="220" transform="rotate(35, 480, 220)">POST /orders/close</text>
+
+            <!-- BeerFlow -> Taps (Fetch active keg) -->
+            <path id="link-bf-taps" class="link" d="M 370 110 L 520 110" stroke="#34d399" marker-end="url(#arrow-taps)" />
+            <text class="link-label" x="385" y="102">GET /active-keg</text>
+
+            <!-- Billing -> Postgres (User transactions) -->
+            <path id="link-bill-db" class="link" d="M 640 380 L 640 430" stroke="#f43f5e" marker-end="url(#arrow-generic)" />
+
+            <!-- Taps -> Postgres (Taps and Kegs metadata) -->
+            <path id="link-taps-db" class="link" d="M 670 460 L 670 430" stroke="#f43f5e" marker-end="url(#arrow-generic)" />
+
+            <!-- Nodes -->
+            <!-- ESP32 Simulator -->
+            <g class="node" style="color: var(--color-beerflow);" onclick="showInfo('sensor')">
+              <rect x="20" y="90" width="100" height="70" stroke="var(--color-beerflow)"/>
+              <text x="32" y="125">ESP32 Sim</text>
+              <text x="35" y="145" class="port">Sensor IoT</text>
+            </g>
+
+            <!-- Mosquitto MQTT -->
+            <g class="node" style="color: var(--color-mqtt);" onclick="showInfo('mqtt')">
+              <rect x="70" y="280" width="110" height="70" stroke="var(--color-mqtt)"/>
+              <text x="82" y="315">Mosquitto</text>
+              <text x="85" y="335" class="port">Mqtt: 1883</text>
+            </g>
+
+            <!-- BeerFlow Service -->
+            <g class="node" style="color: var(--color-beerflow);" onclick="showInfo('beerflow')">
+              <rect x="260" y="90" width="150" height="110" stroke="var(--color-beerflow)"/>
+              <text x="278" y="125" font-weight="700">beerflow-service</text>
+              <text x="278" y="145" class="port">Puerto: 8000</text>
+              <text x="278" y="165" class="port">FastAPI (Realtime)</text>
+              <text x="278" y="185" class="port">Python</text>
+            </g>
+
+            <!-- Redis Cache -->
+            <g class="node" style="color: var(--color-redis);" onclick="showInfo('redis')">
+              <rect x="230" y="290" width="100" height="70" stroke="var(--color-redis)"/>
+              <text x="262" y="325">Redis</text>
+              <text x="245" y="345" class="port">Port: 6379</text>
+            </g>
+
+            <!-- Frontend (React SPA) -->
+            <g class="node" style="color: var(--color-frontend);" onclick="showInfo('frontend')">
+              <rect x="310" y="290" width="110" height="120" stroke="var(--color-frontend)"/>
+              <text x="330" y="335" font-weight="700">frontend</text>
+              <text x="330" y="355" class="port">Vite + React</text>
+              <text x="330" y="375" class="port">Puerto: 3000</text>
+              <text x="330" y="395" class="port">TailwindCSS</text>
+            </g>
+
+            <!-- Billing Service -->
+            <g class="node" style="color: var(--color-billing);" onclick="showInfo('billing')">
+              <rect x="520" y="320" width="160" height="70" stroke="var(--color-billing)"/>
+              <text x="532" y="350" font-weight="700">billing-service</text>
+              <text x="532" y="370" class="port">Puerto: 8001 | FastAPI</text>
+            </g>
+
+            <!-- Tap Management Service -->
+            <g class="node" style="color: var(--color-taps);" onclick="showInfo('taps')">
+              <rect x="520" y="90" width="200" height="90" stroke="var(--color-taps)"/>
+              <text x="532" y="125" font-weight="700">tap-management-service</text>
+              <text x="532" y="145" class="port">Puerto: 8002 | FastAPI</text>
+              <text x="532" y="165" class="port">Gestión Taps/Kegs</text>
+            </g>
+
+            <!-- Postgres Database -->
+            <g class="node" style="color: var(--color-db);" onclick="showInfo('postgres')">
+              <rect x="590" y="430" width="120" height="70" stroke="var(--color-db)"/>
+              <text x="612" y="465" font-weight="700">PostgreSQL</text>
+              <text x="620" y="485" class="port">Port: 5432</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Info Details Column -->
+      <div class="card details-panel">
+        <h2 id="component-title">Selecciona un componente</h2>
+        <div id="component-desc">
+          <p>Haz clic en cualquier nodo o servicio del diagrama de la izquierda para ver su descripción detallada, tecnologías involucradas, puertos y el tipo de comunicación que utiliza dentro de BeerFlow Manager.</p>
+        </div>
+
+        <div class="flow-steps">
+          <h3>Flujo de Sesión Activa de Cerveza</h3>
+          <ul class="step-list">
+            <li class="step-item">
+              <div class="step-num">1</div>
+              <div class="step-text">
+                <h4>Inicio de Vertido e IoT</h4>
+                <p>El sensor ESP32 (o simulador) comienza a enviar pulsos. Lo hace mediante una petición HTTP POST a <code>/sensor/pulse</code> o publicando en Mosquitto MQTT.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <div class="step-num">2</div>
+              <div class="step-text">
+                <h4>Procesamiento y Cacheo</h4>
+                <p><code>beerflow-service</code> recibe los pulsos, calcula los mililitros y el precio parcial usando los datos de grifo/barril, y actualiza la clave <code>tap:{tap_id}</code> en Redis.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <div class="step-num">3</div>
+              <div class="step-text">
+                <h4>Transmisión en Tiempo Real</h4>
+                <p>El cliente frontend, conectado a la ruta WebSocket <code>/ws/{tap_id}</code>, recibe actualizaciones de estado cada 200 milisegundos y renderiza el vaso llenándose en tiempo real.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <div class="step-num">4</div>
+              <div class="step-text">
+                <h4>Timeout y Cierre Financiero</h4>
+                <p>Al detectar inactividad (5 segundos), <code>beerflow-service</code> cierra la sesión, notifica a <code>billing-service</code> para generar la transacción y a <code>tap-management-service</code> para descontar el stock persistente en PostgreSQL, limpiando la caché en Redis.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const infoData = {
+      sensor: {
+        title: "ESP32 Sensor Simulator",
+        color: "var(--color-beerflow)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-beerflow)"></span>Rol en el Sistema</h3>
+            <p>Simula el hardware del caudalímetro en el grifo físico. Emite pulsos a medida que el líquido fluye.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-beerflow)"></span>Protocolos</h3>
+            <p><strong>HTTP POST:</strong> Envía payloads a <code>http://beerflow-service:8000/sensor/pulse</code> cada 200ms.<br>
+            <strong>MQTT:</strong> Publica de forma alternativa en el topic <code>beerflow/taps/{tap_id}/pulses</code>.</p>
+          </div>
+        `
+      },
+      mqtt: {
+        title: "Broker MQTT Mosquitto",
+        color: "var(--color-mqtt)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-mqtt)"></span>Rol en el Sistema</h3>
+            <p>Administra la mensajería IoT ligera de pub/sub, permitiendo desacoplar los sensores de hardware del backend.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-mqtt)"></span>Puertos y Config</h3>
+            <p>Puerto <strong>1883</strong> para conexiones TCP estándar.<br>
+            Puerto <strong>9001</strong> para WebSockets sobre MQTT.</p>
+          </div>
+        `
+      },
+      beerflow: {
+        title: "beerflow-service (FastAPI)",
+        color: "var(--color-beerflow)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-beerflow)"></span>Rol en el Sistema</h3>
+            <p>Es el núcleo IoT y WebSocket de la aplicación. Maneja el estado volátil de las tiradas de cerveza.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-beerflow)"></span>Funcionamiento</h3>
+            <p>Mantiene las conexiones Websocket abiertas con el frontend, lee los datos de flujo agregados de Redis y los retransmite en tiempo real. Cuando expira el tiempo de sesión por inactividad, coordina las llamadas REST hacia Billing y Tap Management para persistir el cobro y el inventario.</p>
+          </div>
+        `
+      },
+      redis: {
+        title: "Redis In-Memory Cache",
+        color: "var(--color-redis)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-redis)"></span>Rol en el Sistema</h3>
+            <p>Almacena de forma ultra rápida los estados temporales de flujo y sesiones (<code>tap:{tap_id}</code> y <code>keg:remaining:{tap_id}</code>).</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-redis)"></span>Alertas de Inventario</h3>
+            <p>Publica eventos en el canal pub/sub <code>admin:alerts</code> cuando el volumen de un barril baja de 2.5L para notificar en tiempo real al Dashboard del Administrador.</p>
+          </div>
+        `
+      },
+      frontend: {
+        title: "Frontend (Vite + React)",
+        color: "var(--color-frontend)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-frontend)"></span>Rol en el Sistema</h3>
+            <p>Interfaz SPA para el usuario final (vista del grifo público) y para los administradores (dashboard).</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-frontend)"></span>Características</h3>
+            <p>Conexión WebSocket persistente al backend de flujos, permitiendo animar la cerveza llenándose con Framer Motion. Consume las APIs REST de facturación y administración de grifos.</p>
+          </div>
+        `
+      },
+      billing: {
+        title: "billing-service (FastAPI)",
+        color: "var(--color-billing)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-billing)"></span>Rol en el Sistema</h3>
+            <p>Gestión de usuarios, Roles (ADMIN, CUSTOMER), seguridad mediante Tokens JWT y registro transaccional financiero.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-billing)"></span>Endpoints Clave</h3>
+            <p><code>/auth/register</code> y <code>/auth/login</code>.<br>
+            <code>/orders/close</code> para procesar y cobrar las tiradas de cerveza una vez terminadas.</p>
+          </div>
+        `
+      },
+      taps: {
+        title: "tap-management-service (FastAPI)",
+        color: "var(--color-taps)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-taps)"></span>Rol en el Sistema</h3>
+            <p>Mantiene el registro maestro y estado de los grifos físicos y los barriles de cerveza (kegs) instalados.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-taps)"></span>Funciones Clave</h3>
+            <p>Permite a los administradores asociar barriles a los grifos, definir los precios por mililitro y descontar stock persistente de PostgreSQL tras cada consumo a través del endpoint <code>/kegs/{keg_id}/consume</code>.</p>
+          </div>
+        `
+      },
+      postgres: {
+        title: "Base de Datos PostgreSQL",
+        color: "var(--color-db)",
+        html: `
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-db)"></span>Rol en el Sistema</h3>
+            <p>Almacenamiento persistente de datos relacionales estructurados.</p>
+          </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-db)"></span>Tablas Principales</h3>
+            <p><strong>users:</strong> Credenciales (hasheadas con bcrypt) y roles.<br>
+            <strong>taps:</strong> Códigos de grifos, asociaciones a barriles, precios por ml.<br>
+            <strong>kegs:</strong> Nombre del barril, estilo de cerveza, capacidad total y mililitros restantes.</p>
+          </div>
+        `
+      }
+    };
+
+    function showInfo(key) {
+      const data = infoData[key];
+      if (!data) return;
+
+      const titleNode = document.getElementById('component-title');
+      const descNode = document.getElementById('component-desc');
+
+      titleNode.innerText = data.title;
+      titleNode.style.color = data.color;
+      descNode.innerHTML = data.html;
+
+      // Remove previous active highlights
+      document.querySelectorAll('.link').forEach(link => {
+        link.classList.remove('active-link');
+      });
+
+      // Highlight connections related to the selected component
+      if (key === 'sensor') {
+        highlightLink('link-sensor-bf');
+        highlightLink('link-sensor-mqtt');
+      } else if (key === 'beerflow') {
+        highlightLink('link-sensor-bf');
+        highlightLink('link-fe-bf');
+        highlightLink('link-bf-redis');
+        highlightLink('link-bf-bill');
+        highlightLink('link-bf-taps');
+      } else if (key === 'frontend') {
+        highlightLink('link-fe-bf');
+        highlightLink('link-fe-bill');
+        highlightLink('link-fe-taps');
+      } else if (key === 'billing') {
+        highlightLink('link-fe-bill');
+        highlightLink('link-bf-bill');
+        highlightLink('link-bill-db');
+      } else if (key === 'taps') {
+        highlightLink('link-fe-taps');
+        highlightLink('link-bf-taps');
+        highlightLink('link-taps-db');
+      } else if (key === 'postgres') {
+        highlightLink('link-bill-db');
+        highlightLink('link-taps-db');
+      } else if (key === 'redis') {
+        highlightLink('link-bf-redis');
+      } else if (key === 'mqtt') {
+        highlightLink('link-sensor-mqtt');
+        highlightLink('link-mqtt-bf');
+      }
+    }
+
+    function highlightLink(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('active-link');
+      }
+    }
+  </script>
+</body>
+</html>
