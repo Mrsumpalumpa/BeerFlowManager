@@ -28,11 +28,22 @@ async def test_receive_pulse_success(mock_client_class, client, mock_redis):
     # Hacer que la llamada al gestor de contexto retorne nuestro mock_client
     mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
 
+    # Simulamos que el grifo ya ha sido desbloqueado por un cliente
+    await mock_redis.setex("tap:tap-001", 300, json.dumps({
+        "tap_id": "tap-001",
+        "ml_total": 0.0,
+        "price_current": 0.0,
+        "status": "open",
+        "last_pulse_at": 1000000000.0,
+        "customer_id": "test-customer",
+    }))
+
     # Enviar un pulso de 10 unidades. A 2.25 ml por pulso, es 22.5 ml.
     payload = {
         "tap_id": "tap-001",
         "pulses": 10
     }
+
     
     response = await client.post("/sensor/pulse", json=payload)
     
@@ -62,10 +73,20 @@ async def test_receive_pulse_no_keg_error(mock_client_class, client, mock_redis)
     mock_client.get.return_value = mock_resp
     mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
 
+    await mock_redis.setex("tap:tap-001", 300, json.dumps({
+        "tap_id": "tap-001",
+        "ml_total": 0.0,
+        "price_current": 0.0,
+        "status": "open",
+        "last_pulse_at": 1000000000.0,
+        "customer_id": "test-customer",
+    }))
+
     payload = {
         "tap_id": "tap-001",
         "pulses": 5
     }
+
     
     response = await client.post("/sensor/pulse", json=payload)
     assert response.status_code == 400
@@ -87,10 +108,20 @@ async def test_receive_pulse_low_stock_block(mock_client_class, client, mock_red
     mock_client.get.return_value = mock_resp
     mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
 
+    await mock_redis.setex("tap:tap-001", 300, json.dumps({
+        "tap_id": "tap-001",
+        "ml_total": 0.0,
+        "price_current": 0.0,
+        "status": "open",
+        "last_pulse_at": 1000000000.0,
+        "customer_id": "test-customer",
+    }))
+
     payload = {
         "tap_id": "tap-001",
         "pulses": 5
     }
+
     
     response = await client.post("/sensor/pulse", json=payload)
     assert response.status_code == 400
@@ -114,10 +145,20 @@ async def test_receive_pulse_publishes_alert(mock_client_class, client, mock_red
     mock_client.get.return_value = mock_resp
     mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
 
+    await mock_redis.setex("tap:tap-001", 300, json.dumps({
+        "tap_id": "tap-001",
+        "ml_total": 0.0,
+        "price_current": 0.0,
+        "status": "open",
+        "last_pulse_at": 1000000000.0,
+        "customer_id": "test-customer",
+    }))
+
     payload = {
         "tap_id": "tap-001",
         "pulses": 10
     }
+
 
     response = await client.post("/sensor/pulse", json=payload)
     assert response.status_code == 200
@@ -131,3 +172,47 @@ async def test_receive_pulse_publishes_alert(mock_client_class, client, mock_red
     assert alert_msg["type"] == "LOW_STOCK"
     assert alert_msg["tap_id"] == "tap-001"
     assert alert_msg["current_volume_ml"] == 2487.5
+
+@pytest.mark.asyncio
+@patch("routers.sensor.httpx.AsyncClient")
+async def test_receive_pulse_locked(mock_client_class, client, mock_redis):
+    mock_client = AsyncMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "keg_id": "keg-123",
+        "remaining_ml": 10000.0,
+        "capacity_ml": 25000.0,
+        "price_per_ml": 0.005,
+        "beer_style": "IPA"
+    }
+    mock_client.get.return_value = mock_resp
+    mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+
+    # No establecemos el estado en Redis, simulando que el grifo está bloqueado
+    payload = {
+        "tap_id": "tap-001",
+        "pulses": 5
+    }
+
+    response = await client.post("/sensor/pulse", json=payload)
+    assert response.status_code == 403
+    assert "bloqueado" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_unlock_tap(client, mock_redis):
+    payload = {
+        "tap_id": "tap-002",
+        "customer_id": "test-client-id"
+    }
+    response = await client.post("/sensor/unlock", json=payload)
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    
+    # Verificar que el estado se inicializó en Redis
+    raw_state = await mock_redis.get("tap:tap-002")
+    assert raw_state is not None
+    state = json.loads(raw_state)
+    assert state["status"] == "open"
+    assert state["customer_id"] == "test-client-id"
+    assert state["tap_id"] == "tap-002"

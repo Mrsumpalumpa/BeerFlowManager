@@ -1,5 +1,6 @@
 import os
 from enum import Enum
+from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column
 
@@ -20,6 +21,18 @@ class User(Base):
     username: Mapped[str] = mapped_column(unique=True, index=True)
     password_hash: Mapped[str] = mapped_column()
     role: Mapped[RoleEnum] = mapped_column(default=RoleEnum.CUSTOMER)
+
+class Consumption(Base):
+    __tablename__ = "consumptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    customer_id: Mapped[int] = mapped_column(index=True)
+    tap_id: Mapped[str] = mapped_column(index=True)
+    keg_id: Mapped[str] = mapped_column(index=True)
+    beer_style: Mapped[str] = mapped_column()
+    ml_served: Mapped[float] = mapped_column()
+    total_amount: Mapped[float] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
 # Helper para inyección de dependencias
 async def get_db():

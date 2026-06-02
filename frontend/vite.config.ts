@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     babel({ presets: [reactCompilerPreset()] })
-  ],
+  ] as any,
   server: {
     host: '0.0.0.0',
     port: 3000,
@@ -22,6 +22,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-  },
-})
+  }
+} as any)
 

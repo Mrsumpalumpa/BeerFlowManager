@@ -19,6 +19,7 @@ import httpx
 
 BEERFLOW_URL = os.getenv("BEERFLOW_URL", "http://localhost:8000")
 TAP_ID = os.getenv("TAP_ID", "tap-001")
+CUSTOMER_ID = os.getenv("CUSTOMER_ID", None)
 INTERVAL_MS = int(os.getenv("PULSE_INTERVAL_MS", "200"))
 
 # YF-S201: ~450 pulsos/litro a caudal máximo (~1-30 L/min)
@@ -26,14 +27,32 @@ INTERVAL_MS = int(os.getenv("PULSE_INTERVAL_MS", "200"))
 PULSES_PER_INTERVAL = 9
 
 
-def simulate(tap_id: str, duration_seconds: int = 30):
+def simulate(tap_id: str, duration_seconds: int = 30, customer_id: str = None):
     print(f"[simulator] Simulando grifo {tap_id} durante {duration_seconds}s")
-    print(f"[simulator] Enviando a {BEERFLOW_URL}/sensor/pulse")
-
-    start = time.time()
-    total_ml = 0.0
-
+    
     with httpx.Client(timeout=5.0) as client:
+        # Si se proporciona customer_id, desbloquear el grifo primero
+        if customer_id:
+            print(f"[simulator] Desbloqueando grifo para el cliente {customer_id}...")
+            try:
+                resp = client.post(
+                    f"{BEERFLOW_URL}/sensor/unlock",
+                    json={"tap_id": tap_id, "customer_id": customer_id}
+                )
+                if resp.status_code == 200:
+                    print("[simulator] ✅ Grifo desbloqueado correctamente.")
+                else:
+                    print(f"[simulator] ❌ Error desbloqueando: {resp.status_code} - {resp.text}")
+                    return
+            except Exception as e:
+                print(f"[simulator] ❌ Error de conexión al desbloquear: {e}")
+                return
+                
+        print(f"[simulator] Enviando a {BEERFLOW_URL}/sensor/pulse")
+
+        start = time.time()
+        total_ml = 0.0
+
         while time.time() - start < duration_seconds:
             # Simula variación natural del caudal (±2 pulsos)
             pulses = PULSES_PER_INTERVAL + random.randint(-2, 2)
@@ -75,6 +94,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BeerFlow sensor simulator")
     parser.add_argument("--tap-id", default=TAP_ID)
     parser.add_argument("--duration", type=int, default=30, help="Segundos de simulación")
+    parser.add_argument("--customer-id", default=CUSTOMER_ID, help="ID de cliente para desbloquear automáticamente el grifo")
     args = parser.parse_args()
 
-    simulate(args.tap_id, args.duration)
+    simulate(args.tap_id, args.duration, args.customer_id)
