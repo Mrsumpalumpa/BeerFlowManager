@@ -1,4 +1,5 @@
 .env
 .venv-test
 test-results
-__pycache__/*
+__pycache__
+.pytest_cache
