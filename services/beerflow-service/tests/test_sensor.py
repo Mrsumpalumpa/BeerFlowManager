@@ -10,7 +10,7 @@ async def test_health(client):
     assert response.json() == {"status": "ok", "service": "beerflow-service"}
 
 @pytest.mark.asyncio
-@patch("routers.sensor.httpx.AsyncClient")
+@patch("controllers.sensor_controller.httpx.AsyncClient")
 async def test_receive_pulse_success(mock_client_class, client, mock_redis):
     # Configurar mock de httpx.AsyncClient
     mock_client = AsyncMock()
@@ -58,7 +58,7 @@ async def test_receive_pulse_success(mock_client_class, client, mock_redis):
     assert float(await mock_redis.get("keg:remaining:tap-001")) == 9977.5 # 10000 - 22.5
 
 @pytest.mark.asyncio
-@patch("routers.sensor.httpx.AsyncClient")
+@patch("controllers.sensor_controller.httpx.AsyncClient")
 async def test_receive_pulse_no_keg_error(mock_client_class, client, mock_redis):
     mock_client = AsyncMock()
     mock_resp = MagicMock()
@@ -93,7 +93,7 @@ async def test_receive_pulse_no_keg_error(mock_client_class, client, mock_redis)
     assert "no tiene ningún barril" in response.json()["detail"]
 
 @pytest.mark.asyncio
-@patch("routers.sensor.httpx.AsyncClient")
+@patch("controllers.sensor_controller.httpx.AsyncClient")
 async def test_receive_pulse_low_stock_block(mock_client_class, client, mock_redis):
     mock_client = AsyncMock()
     mock_resp = MagicMock()
@@ -128,7 +128,7 @@ async def test_receive_pulse_low_stock_block(mock_client_class, client, mock_red
     assert "bloqueado" in response.json()["detail"]
 
 @pytest.mark.asyncio
-@patch("routers.sensor.httpx.AsyncClient")
+@patch("controllers.sensor_controller.httpx.AsyncClient")
 async def test_receive_pulse_publishes_alert(mock_client_class, client, mock_redis):
     mock_client = AsyncMock()
     mock_resp = MagicMock()
@@ -174,7 +174,7 @@ async def test_receive_pulse_publishes_alert(mock_client_class, client, mock_red
     assert alert_msg["current_volume_ml"] == 2487.5
 
 @pytest.mark.asyncio
-@patch("routers.sensor.httpx.AsyncClient")
+@patch("controllers.sensor_controller.httpx.AsyncClient")
 async def test_receive_pulse_locked(mock_client_class, client, mock_redis):
     mock_client = AsyncMock()
     mock_resp = MagicMock()
