@@ -55,7 +55,7 @@ Cada microservicio contiene su propia suite de pruebas bajo su respectivo direct
 
 ### Catálogo de Tests Unitarios del Backend
 
-#### `beerflow-service` — `tests/test_sensor.py` (5 tests)
+#### `beerflow-service` — `tests/test_sensor.py` (7 tests)
 
 | # | Test | Descripción |
 |---|------|-------------|
@@ -64,6 +64,10 @@ Cada microservicio contiene su propia suite de pruebas bajo su respectivo direct
 | 3 | `test_receive_pulse_no_keg_error` | Simula que el grifo no tiene barril asignado (`keg_id="no-keg"`, `remaining_ml=0`). Verifica que devuelve `400` con el mensaje "no tiene ningún barril". |
 | 4 | `test_receive_pulse_low_stock_block` | Simula stock bajo (4% restante, inferior al umbral del 5%). Verifica que la petición se bloquea con `400` y el mensaje "bloqueado". |
 | 5 | `test_receive_pulse_publishes_alert` | Simula stock en el límite (2510 ml de 25000 ml). Tras consumir 22.5 ml, el stock baja a 2487.5 ml (≤10%). Verifica que se publica una alerta `LOW_STOCK` al canal Redis `admin:alerts` con los datos del grifo y volumen actual. |
+| 6 | `test_receive_pulse_locked` | Intenta enviar pulsos a un grifo bloqueado (sin sesión en Redis) y verifica que devuelve `403`. |
+| 7 | `test_unlock_tap` | Desbloquea un grifo y verifica que se inicializa correctamente la sesión `open` en Redis para el cliente dado. |
+
+> **Nota IoT:** La lógica central de estos tests ahora valida el controlador `sensor_controller.py`, lo que garantiza que la funcionalidad es correcta tanto para peticiones HTTP como para los mensajes provenientes del broker **MQTT**.
 
 #### `billing-service` — `tests/test_auth.py` (5 tests)
 

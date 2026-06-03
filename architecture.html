@@ -478,6 +478,16 @@
             <h3><span class="dot" style="background:var(--color-beerflow)"></span>Funcionamiento</h3>
             <p>Mantiene las conexiones Websocket abiertas con el frontend, lee los datos de flujo agregados de Redis y los retransmite en tiempo real. Cuando expira el tiempo de sesión por inactividad, coordina las llamadas REST hacia Billing y Tap Management para persistir el cobro y el inventario.</p>
           </div>
+          <div class="info-section">
+            <h3><span class="dot" style="background:var(--color-beerflow)"></span>Endpoints</h3>
+            <ul style="list-style:none; padding-left:0; font-size:0.9em; line-height:1.5;">
+              <li><code>GET /health</code></li>
+              <li><code>POST /sensor/pulse</code></li>
+              <li><code>POST /sensor/unlock</code></li>
+              <li><code>WS /ws/{tap_id}</code></li>
+              <li><code>MQTT beerflow/taps/+/+</code></li>
+            </ul>
+          </div>
         `
       },
       redis: {
@@ -517,9 +527,16 @@
             <p>Gestión de usuarios, Roles (ADMIN, CUSTOMER), seguridad mediante Tokens JWT y registro transaccional financiero.</p>
           </div>
           <div class="info-section">
-            <h3><span class="dot" style="background:var(--color-billing)"></span>Endpoints Clave</h3>
-            <p><code>/auth/register</code> y <code>/auth/login</code>.<br>
-            <code>/orders/close</code> para procesar y cobrar las tiradas de cerveza una vez terminadas.</p>
+            <h3><span class="dot" style="background:var(--color-billing)"></span>Endpoints Principales</h3>
+            <ul style="list-style:none; padding-left:0; font-size:0.9em; line-height:1.5;">
+              <li><code>GET /health</code></li>
+              <li><code>GET /metrics</code></li>
+              <li><code>POST /orders/close</code></li>
+              <li><code>POST /auth/register</code> | <code>/auth/login</code></li>
+              <li><code>GET /auth/users</code></li>
+              <li><code>PUT | DELETE /auth/users/{user_id}</code></li>
+              <li><code>POST /auth/users/{user_id}/qr-token</code></li>
+            </ul>
           </div>
         `
       },
@@ -532,8 +549,17 @@
             <p>Mantiene el registro maestro y estado de los grifos físicos y los barriles de cerveza (kegs) instalados.</p>
           </div>
           <div class="info-section">
-            <h3><span class="dot" style="background:var(--color-taps)"></span>Funciones Clave</h3>
-            <p>Permite a los administradores asociar barriles a los grifos, definir los precios por mililitro y descontar stock persistente de PostgreSQL tras cada consumo a través del endpoint <code>/kegs/{keg_id}/consume</code>.</p>
+            <h3><span class="dot" style="background:var(--color-taps)"></span>Endpoints Principales</h3>
+            <ul style="list-style:none; padding-left:0; font-size:0.9em; line-height:1.4; display:grid; grid-template-columns: 1fr 1fr; gap:0.25rem;">
+              <li><code>GET /health</code></li>
+              <li><code>WS /ws/admin</code></li>
+              <li><code>GET /taps</code></li>
+              <li><code>GET /taps/{id}/price</code></li>
+              <li><code>GET /taps/{id}/active-keg</code></li>
+              <li><code>POST /kegs/{id}/consume</code></li>
+              <li><code>GET|POST /admin/kegs</code></li>
+              <li><code>POST|DEL /admin/taps</code></li>
+            </ul>
           </div>
         `
       },

@@ -12,6 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import sensor, websocket as ws_router
+from mqtt_client import mqtt_listener
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 ML_PER_PULSE = float(os.getenv("ML_PER_PULSE", "2.25"))
@@ -22,8 +23,10 @@ SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT_SECONDS", "3"))
 async def lifespan(app: FastAPI):
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     task = asyncio.create_task(cleanup_idle_sessions(app))
+    mqtt_task = asyncio.create_task(mqtt_listener(app.state.redis))
     yield
     task.cancel()
+    mqtt_task.cancel()
     await app.state.redis.aclose()
 
 async def cleanup_idle_sessions(app: FastAPI):

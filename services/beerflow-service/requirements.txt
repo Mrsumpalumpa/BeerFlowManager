@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 redis
 websockets
-paho-mqtt
+aiomqtt==2.3.0
 pydantic
 pydantic-settings
 python-dotenv
